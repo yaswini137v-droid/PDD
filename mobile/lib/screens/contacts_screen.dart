@@ -211,7 +211,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
                                       const SizedBox(width: 8),
                                       if (contact['relationship'] != null && contact['relationship'].isNotEmpty)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, py: 2),
+                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                           decoration: BoxDecoration(
                                             color: accentColor.withOpacity(0.1),
                                             borderRadius: BorderRadius.circular(20),

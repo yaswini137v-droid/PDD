@@ -202,7 +202,7 @@ class _GeofenceScreenState extends State<GeofenceScreen> {
 
                           // Radius Slider
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.between,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               const Text('Safe Radius:', style: TextStyle(color: Colors.grey, fontSize: 13)),
                               Text(

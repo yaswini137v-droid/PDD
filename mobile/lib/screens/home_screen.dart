@@ -371,7 +371,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                                         style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 34,
-                                          fontWeight: FontWeight.extrabold,
+                                          fontWeight: FontWeight.w800,
                                           letterSpacing: 1.5,
                                         ),
                                       ),
@@ -429,7 +429,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                           
                           // Telemetry stats row
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.between,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 'Telemetry: (${_currLat.toStringAsFixed(4)}, ${_currLng.toStringAsFixed(4)})',

@@ -234,7 +234,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                                 point: _destinationPosition,
                                 radius: _radius,
                                 useRadiusInMeter: true,
-                                fillColor: accentColor.withOpacity(0.15),
+                                color: accentColor.withOpacity(0.15),
                                 borderColor: accentColor,
                                 borderStrokeWidth: 2,
                               ),
@@ -333,7 +333,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
                       // Radius slider
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Geofence Radius:', style: TextStyle(color: Colors.grey, fontSize: 13)),
                           Text('${_radius.toInt()}m', style: const TextStyle(color: accentColor, fontWeight: FontWeight.bold)),
@@ -351,7 +351,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
                       // Travel reach timer slider
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.between,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Expected Duration:', style: TextStyle(color: Colors.grey, fontSize: 13)),
                           Text('$_durationMinutes mins', style: const TextStyle(color: Colors.pinkAccent, fontWeight: FontWeight.bold)),
