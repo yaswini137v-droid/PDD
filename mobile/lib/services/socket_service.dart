@@ -14,7 +14,7 @@ class SocketService {
     if (_socket != null && _socket!.connected) return;
 
     // Use backend host IP for local emulator connection (10.0.2.2)
-    const String socketUrl = 'http://10.0.2.2:5000';
+    const String socketUrl = 'https://pdd-mkge.onrender.com';
     print('Connecting socket client to: $socketUrl');
 
     _socket = IO.io(socketUrl, IO.OptionBuilder()

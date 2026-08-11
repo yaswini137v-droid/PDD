@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   // Use local server IP. On Android emulator, 10.0.2.2 points to host's localhost (127.0.0.1)
-  static const String baseUrl = 'http://10.0.2.2:5000/api';
+  static const String baseUrl = 'https://pdd-mkge.onrender.com/api';
   
   static String _token = '';
 
