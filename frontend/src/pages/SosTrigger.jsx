@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import { ShieldAlert, Crosshair, ArrowLeft, ShieldCheck, MapPin, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const SosTrigger = () => {
-  const { apiRequest } = useAuth();
+  const { user, apiRequest } = useAuth();
+  const { socket } = useSocket();
   const [sosActive, setSosActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [coords, setCoords] = useState({ lat: 13.2172, lng: 79.1003 }); // Default Chittoor
   const [gpsStatus, setGpsStatus] = useState('Default Coordinates');
   const [guardians, setGuardians] = useState([]);
+  const [responders, setResponders] = useState([]);
 
   // Synthesize warning beacon sound locally on trigger
   const audioCtxRef = useRef(null);
@@ -72,9 +75,16 @@ const SosTrigger = () => {
       if (activeRes.success) {
         // Check if there is an alert corresponding to this logged-in user
         // For testing, we check if any active alert matches our profile
-        const myAlert = activeRes.data.find(a => a.user?._id === activeRes.userId);
+        const myAlert = activeRes.data.find(a => a.user?._id === activeRes.userId || a.user?.id === activeRes.userId);
         if (myAlert) {
           setSosActive(true);
+          if (myAlert.responders) {
+            setResponders(myAlert.responders.map(r => ({
+              id: r.user?._id || r.user?.id || '',
+              name: r.user?.name || '',
+              phone: r.user?.phone || '',
+            })));
+          }
         }
       }
     } catch (err) {
@@ -87,6 +97,27 @@ const SosTrigger = () => {
     detectLocation();
     return () => stopSiren();
   }, []);
+
+  useEffect(() => {
+    if (!socket || !user) return;
+    
+    socket.emit('join_user', user._id);
+    
+    socket.on('responder_updated', (data) => {
+      console.log('Real-time responder updated:', data);
+      const resp = data.responder;
+      if (resp) {
+        setResponders((prev) => {
+          if (prev.some((r) => r.id === resp.id)) return prev;
+          return [...prev, { id: resp.id, name: resp.name, phone: resp.phone }];
+        });
+      }
+    });
+    
+    return () => {
+      socket.off('responder_updated');
+    };
+  }, [socket, user]);
 
   useEffect(() => {
     if (sosActive) {
@@ -156,6 +187,7 @@ const SosTrigger = () => {
 
       if (res.success) {
         setSosActive(false);
+        setResponders([]);
       } else {
         setError(res.message || 'Resolve failed.');
       }
@@ -256,6 +288,36 @@ const SosTrigger = () => {
                 </div>
               )}
             </div>
+
+            {/* Rescue Coordination Panel */}
+            {sosActive && (
+              <div className="glass-panel p-6 space-y-4 shadow-sm border border-red-200/50 bg-red-50/20">
+                <h2 className="text-lg font-bold text-red-700 flex items-center gap-2 border-b border-red-100 pb-3">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" /> Rescue Coordination
+                </h2>
+                
+                {responders.length === 0 ? (
+                  <p className="text-xs text-slate-500 text-center py-4 font-medium italic">
+                    Waiting for nearby neighbors to respond...
+                  </p>
+                ) : (
+                  <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1">
+                    <p className="text-xs font-bold text-slate-700">{responders.length} neighbor(s) on the way:</p>
+                    {responders.map((r, idx) => (
+                      <div key={idx} className="p-3 bg-white border border-emerald-100 rounded-xl shadow-sm flex justify-between items-center">
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">{r.name}</p>
+                          <p className="text-[10px] text-slate-500 font-mono mt-0.5">{r.phone}</p>
+                        </div>
+                        <span className="text-[9px] bg-emerald-50 border border-emerald-100 text-emerald-700 font-extrabold px-2.5 py-0.5 rounded-full uppercase">
+                          EN ROUTE
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right panel - SOS button ripple */}

@@ -328,4 +328,80 @@ class ApiService {
       return false;
     }
   }
+
+  // Search places using OpenStreetMap Nominatim API
+  static Future<List<Map<String, dynamic>>> searchPlaces(String query, double lat, double lng) async {
+    if (query.trim().isEmpty) return [];
+    try {
+      final url = Uri.parse('https://nominatim.openstreetmap.org/search?q=${Uri.encodeComponent(query)}&format=json&limit=6&lat=$lat&lon=$lng&addressdetails=1');
+      final response = await http.get(url, headers: {
+        'User-Agent': 'TravelSafetySOS/1.0 (com.travelsafetysos.mobile)',
+        'Accept': 'application/json',
+      });
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map<Map<String, dynamic>>((item) {
+          return {
+            'name': item['display_name'] ?? 'Unknown place',
+            'lat': double.tryParse(item['lat']?.toString() ?? '') ?? 0.0,
+            'lng': double.tryParse(item['lon']?.toString() ?? '') ?? 0.0,
+          };
+        }).toList();
+      }
+    } catch (e) {
+      print('Error searching places: $e');
+    }
+    return [];
+  }
+
+  // Get User Profile details
+  static Future<Map<String, dynamic>?> getUserProfile() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/auth/me'),
+        headers: await _headers(),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return data['data'];
+      }
+    } catch (e) {
+      print('Error getting user profile: $e');
+    }
+    return null;
+  }
+
+  // Update User Active Geolocation (for neighbor notifications)
+  static Future<void> updateUserLocation(double latitude, double longitude) async {
+    try {
+      await http.put(
+        Uri.parse('$baseUrl/auth/location'),
+        headers: await _headers(),
+        body: jsonEncode({
+          'latitude': latitude,
+          'longitude': longitude,
+        }),
+      );
+    } catch (e) {
+      print('Error updating user active location: $e');
+    }
+  }
+
+  // Respond to nearby SOS Alert
+  static Future<Map<String, dynamic>> respondToSOS(String alertId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/alerts/$alertId/respond'),
+        headers: await _headers(),
+      );
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'data': data['data']};
+      }
+      return {'success': false, 'message': data['message'] ?? 'Failed to mark as responding'};
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
 }
+

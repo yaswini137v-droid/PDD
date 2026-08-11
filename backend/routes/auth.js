@@ -121,4 +121,32 @@ router.get('/me', protect, async (req, res) => {
   }
 });
 
+// @desc    Update user active location coordinates
+// @route   PUT /api/auth/location
+// @access  Private
+router.put('/location', protect, async (req, res) => {
+  const { latitude, longitude } = req.body;
+  try {
+    if (latitude === undefined || longitude === undefined) {
+      return res.status(400).json({ success: false, message: 'Please provide GPS coordinates' });
+    }
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    
+    user.location = {
+      type: 'Point',
+      coordinates: [longitude, latitude], // longitude, latitude order
+    };
+    await user.save();
+    
+    res.json({ success: true, message: 'Location updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
+

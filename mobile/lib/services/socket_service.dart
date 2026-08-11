@@ -7,6 +7,8 @@ class SocketService {
   static Function(Map<String, dynamic>)? onCheckInPrompt;
   static Function(Map<String, dynamic>)? onCheckInAlert;
   static Function(Map<String, dynamic>)? onEmergencyEscalated;
+  static Function(Map<String, dynamic>)? onNearbySosAlert;
+  static Function(Map<String, dynamic>)? onResponderUpdated;
 
   static IO.Socket? get socket => _socket;
 
@@ -53,6 +55,22 @@ class SocketService {
       print('SocketEvent: emergency_escalated received: $data');
       if (onEmergencyEscalated != null) {
         onEmergencyEscalated!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    // Nearby SOS alert received
+    _socket?.on('nearby_sos_alert', (data) {
+      print('SocketEvent: nearby_sos_alert received: $data');
+      if (onNearbySosAlert != null) {
+        onNearbySosAlert!(Map<String, dynamic>.from(data));
+      }
+    });
+
+    // Responder status updated (for user in danger)
+    _socket?.on('responder_updated', (data) {
+      print('SocketEvent: responder_updated received: $data');
+      if (onResponderUpdated != null) {
+        onResponderUpdated!(Map<String, dynamic>.from(data));
       }
     });
 

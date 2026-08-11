@@ -16,6 +16,8 @@ const alertRoutes = require('./routes/alert');
 const Journey = require('./models/Journey');
 const Alert = require('./models/Alert');
 const Contact = require('./models/Contact');
+const User = require('./models/User');
+const { sendEmergencyNotifications } = require('./utils/notification');
 
 const app = express();
 const server = http.createServer(app);
@@ -146,6 +148,30 @@ setInterval(async () => {
           // Fetch user's emergency contacts
           const contacts = await Contact.find({ user: user._id });
 
+          // Send actual emergency alerts to guardians (Email/SMS)
+          sendEmergencyNotifications(user, alert, contacts).catch(err => {
+            console.error('Error triggering automated emergency alerts:', err);
+          });
+
+          // Find nearby neighbors (within 1 km) to notify
+          let nearbyNeighbors = [];
+          try {
+            nearbyNeighbors = await User.find({
+              _id: { $ne: user._id },
+              location: {
+                $near: {
+                  $geometry: {
+                    type: 'Point',
+                    coordinates: [alert.longitude, alert.latitude],
+                  },
+                  $maxDistance: 1000,
+                },
+              },
+            });
+          } catch (err) {
+            console.error('Error finding nearby neighbors in background checker:', err);
+          }
+
           // Broadcast emergency alert via WebSocket
           io.emit('sos_triggered', {
             alertId: alert._id,
@@ -165,6 +191,21 @@ setInterval(async () => {
             triggerType: alert.triggerType,
             contacts: contacts.map(c => ({ name: c.name, phone: c.phone, email: c.email })),
             createdAt: alert.createdAt,
+          });
+
+          // Send direct alerts to each nearby neighbor
+          nearbyNeighbors.forEach(neighbor => {
+            io.to(neighbor._id.toString()).emit('nearby_sos_alert', {
+              alertId: alert._id,
+              user: {
+                id: user._id,
+                name: user.name,
+                phone: user.phone,
+              },
+              latitude: alert.latitude,
+              longitude: alert.longitude,
+              createdAt: alert.createdAt,
+            });
           });
 
           // Notify the mobile client itself of emergency escalation

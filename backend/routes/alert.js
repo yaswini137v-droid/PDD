@@ -3,7 +3,9 @@ const router = express.Router();
 const Alert = require('../models/Alert');
 const Journey = require('../models/Journey');
 const Contact = require('../models/Contact');
+const User = require('../models/User');
 const { protect } = require('../middleware/auth');
+const { sendEmergencyNotifications } = require('../utils/notification');
 
 // @desc    Trigger a new SOS Alert
 // @route   POST /api/alerts/trigger
@@ -40,6 +42,30 @@ router.post('/trigger', protect, async (req, res) => {
     // Fetch user emergency contacts to return and notify
     const contacts = await Contact.find({ user: req.user.id });
 
+    // Send actual emergency alerts to guardians (Email/SMS)
+    sendEmergencyNotifications(req.user, alert, contacts).catch(err => {
+      console.error('Error triggering emergency alerts:', err);
+    });
+
+    // Find nearby neighbors (within 1 km) to notify
+    let nearbyNeighbors = [];
+    try {
+      nearbyNeighbors = await User.find({
+        _id: { $ne: req.user.id },
+        location: {
+          $near: {
+            $geometry: {
+              type: 'Point',
+              coordinates: [longitude, latitude],
+            },
+            $maxDistance: 1000,
+          },
+        },
+      });
+    } catch (err) {
+      console.error('Error finding nearby neighbors:', err);
+    }
+
     // Broadcast real-time emergency alert via Socket.io
     const io = req.app.get('io');
     if (io) {
@@ -61,6 +87,21 @@ router.post('/trigger', protect, async (req, res) => {
         triggerType: alert.triggerType,
         contacts: contacts.map(c => ({ name: c.name, phone: c.phone, email: c.email })),
         createdAt: alert.createdAt,
+      });
+
+      // Send direct alerts to each nearby neighbor
+      nearbyNeighbors.forEach(neighbor => {
+        io.to(neighbor._id.toString()).emit('nearby_sos_alert', {
+          alertId: alert._id,
+          user: {
+            id: req.user.id,
+            name: req.user.name,
+            phone: req.user.phone,
+          },
+          latitude,
+          longitude,
+          createdAt: alert.createdAt,
+        });
       });
     }
 
@@ -129,6 +170,7 @@ router.get('/active', protect, async (req, res) => {
     const alerts = await Alert.find({ status: 'active' })
       .populate('user', 'name phone email')
       .populate('journey', 'destinationName travelMode vehicleNumber')
+      .populate('responders.user', 'name phone email')
       .sort({ createdAt: -1 });
 
     res.json({ success: true, count: alerts.length, data: alerts });
@@ -138,4 +180,60 @@ router.get('/active', protect, async (req, res) => {
   }
 });
 
+// @desc    Respond to an SOS Alert (as a neighbor)
+// @route   POST /api/alerts/:id/respond
+// @access  Private
+router.post('/:id/respond', protect, async (req, res) => {
+  try {
+    const alert = await Alert.findById(req.params.id);
+    if (!alert) {
+      return res.status(404).json({ success: false, message: 'Alert not found' });
+    }
+    if (alert.status === 'resolved') {
+      return res.status(400).json({ success: false, message: 'Alert has already been resolved' });
+    }
+
+    // Check if already responding
+    const alreadyResponding = alert.responders.some(r => r.user.toString() === req.user.id);
+    if (alreadyResponding) {
+      return res.json({ success: true, message: 'Already marked as responding', data: alert });
+    }
+
+    alert.responders.push({ user: req.user.id, status: 'responding' });
+    await alert.save();
+
+    // Fetch updated alert with responder details populated
+    const updatedAlert = await Alert.findById(req.params.id)
+      .populate('user', 'name phone email')
+      .populate('responders.user', 'name phone email');
+
+    // Broadcast WebSocket event
+    const io = req.app.get('io');
+    if (io) {
+      // Notify the user in danger that someone is responding
+      io.to(alert.user.toString()).emit('responder_updated', {
+        alertId: alert._id,
+        responder: {
+          id: req.user.id,
+          name: req.user.name,
+          phone: req.user.phone,
+        },
+        status: 'responding',
+      });
+
+      // Notify all dashboard rooms
+      io.emit('dashboard_responder_updated', {
+        alertId: alert._id,
+        responders: updatedAlert.responders,
+      });
+    }
+
+    res.json({ success: true, message: 'Marked as responding', data: updatedAlert });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
+

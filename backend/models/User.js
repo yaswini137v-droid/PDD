@@ -32,7 +32,20 @@ const UserSchema = new mongoose.Schema({
     type: Date,
     default: Date.now,
   },
+  location: {
+    type: {
+      type: String,
+      enum: ['Point'],
+      default: 'Point',
+    },
+    coordinates: {
+      type: [Number], // [longitude, latitude]
+    },
+  },
 });
+
+UserSchema.index({ location: '2dsphere' });
+
 
 // Hash password and MPIN before saving
 UserSchema.pre('save', async function (next) {

@@ -159,12 +159,28 @@ const Dashboard = () => {
       }
     });
 
+    socket.on('dashboard_responder_updated', (updateData) => {
+      console.log('Real-time SOS responder update received:', updateData);
+      setActiveAlerts((prev) => 
+        prev.map((a) => {
+          if (a._id === updateData.alertId) {
+            return {
+              ...a,
+              responders: updateData.responders,
+            };
+          }
+          return a;
+        })
+      );
+    });
+
     return () => {
       socket.off('sos_triggered');
       socket.off('sos_resolved');
       socket.off('journey_started');
       socket.off('journey_updated');
       socket.off('journey_completed');
+      socket.off('dashboard_responder_updated');
     };
   }, [socket, user]);
 
@@ -393,6 +409,20 @@ const Dashboard = () => {
                           <p className="truncate">Trip Destination: {alert.journey.destinationName}</p>
                         )}
                       </div>
+                      
+                      {alert.responders && alert.responders.length > 0 && (
+                        <div className="mt-2.5 pt-2 border-t border-red-200/40">
+                          <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Incoming Responders:</p>
+                          <div className="space-y-1.5 mt-1">
+                            {alert.responders.map((r, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-[10px] bg-white border border-red-100 rounded px-2.5 py-1 text-slate-700 font-bold shadow-sm">
+                                <span>{r.user?.name || 'Neighbor'}</span>
+                                <span className="font-mono text-[9px] text-slate-400 font-medium">{r.user?.phone}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                       
                       <div className="pt-2 border-t border-red-200/50 flex justify-between items-center">
                         <button

@@ -35,6 +35,24 @@ const AlertSchema = new mongoose.Schema({
   resolvedAt: {
     type: Date,
   },
+  responders: [
+    {
+      user: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+      },
+      status: {
+        type: String,
+        enum: ['responding', 'arrived'],
+        default: 'responding',
+      },
+      respondedAt: {
+        type: Date,
+        default: Date.now,
+      },
+    },
+  ],
 });
 
 module.exports = mongoose.model('Alert', AlertSchema);

@@ -9,6 +9,8 @@ import 'journey_screen.dart';
 import 'contacts_screen.dart';
 import 'geofence_screen.dart';
 import 'mpin_checkin_screen.dart';
+import 'responder_map_screen.dart';
+import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,6 +37,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   double _distanceToDest = 0.0;
 
   AnimationController? _rippleController;
+  Timer? _locationUpdateTimer;
+  List<Map<String, dynamic>> _incomingResponders = [];
+
+  @override
+  void dispose() {
+    _locationUpdateTimer?.cancel();
+    _rippleController?.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -114,6 +125,111 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           ),
         );
       };
+
+      SocketService.onNearbySosAlert = (data) {
+        print('Nearby SOS alert WebSocket received: $data');
+        if (mounted) {
+          // Show overlay dialog
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: const Color(0xFF0F172A),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('🚨 NEIGHBOR SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              content: Text(
+                '${data['user']?['name'] ?? 'Someone'} needs help nearby! (within 1 km)',
+                style: const TextStyle(color: Colors.white),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('DISMISS', style: TextStyle(color: Colors.grey)),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop();
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ResponderMapScreen(
+                          alertId: data['alertId'] ?? '',
+                          dangerUserName: data['user']?['name'] ?? 'Someone',
+                          dangerUserPhone: data['user']?['phone'] ?? '',
+                          latitude: double.tryParse(data['latitude']?.toString() ?? '') ?? 0.0,
+                          longitude: double.tryParse(data['longitude']?.toString() ?? '') ?? 0.0,
+                        ),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('SHOW MAP', style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          );
+        }
+      };
+
+      SocketService.onResponderUpdated = (data) {
+        print('Responder update WebSocket received: $data');
+        final resp = data['responder'];
+        if (resp != null) {
+          setState(() {
+            if (!_incomingResponders.any((r) => r['id'] == resp['id'])) {
+              _incomingResponders.add({
+                'id': resp['id'],
+                'name': resp['name'],
+                'phone': resp['phone'],
+              });
+            }
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('🛡️ Neighbor ${resp['name']} is responding to your SOS!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      };
+    }
+
+    // Request permissions and start periodic user active location updates
+    _startPeriodicLocationUpdates();
+  }
+
+  Future<void> _startPeriodicLocationUpdates() async {
+    // Run once immediately
+    _reportLocation();
+    
+    // Then run every 40 seconds
+    _locationUpdateTimer = Timer.periodic(const Duration(seconds: 40), (timer) {
+      _reportLocation();
+    });
+  }
+
+  Future<void> _reportLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      
+      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+        final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.medium);
+        setState(() {
+          _currLat = pos.latitude;
+          _currLng = pos.longitude;
+        });
+        await ApiService.updateUserLocation(pos.latitude, pos.longitude);
+      }
+    } catch (e) {
+      print('Error reporting periodic location: $e');
     }
   }
 
@@ -124,16 +240,18 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
     // Load user details
     try {
-      final userProfile = await ApiService.login('', ''); // loads token context
-      // fallback just retrieves profile
-    } catch (_) {}
+      final profile = await ApiService.getUserProfile();
+      if (profile != null) {
+        _userId = profile['_id'] ?? '';
+        _userName = profile['name'] ?? 'Traveler';
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('userName', _userName);
+      }
+    } catch (e) {
+      print('Error loading user profile: $e');
+    }
 
     final activeJ = await ApiService.getActiveJourney();
-    
-    final prefs = await SharedPreferences.getInstance();
-    final tokenVal = prefs.getString('token') ?? '';
-    // Fetch user ID from jwt decoded or set default
-    _userId = tokenVal.hashCode.toString(); // basic unique string from token
 
     setState(() {
       _activeJourney = activeJ;
@@ -141,6 +259,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _sosActive = activeJ['status'] == 'sos_triggered';
         _currLat = activeJ['currentLatitude'] ?? 0.0;
         _currLng = activeJ['currentLongitude'] ?? 0.0;
+        
+        // Populate responders if journey is already in SOS mode
+        if (_sosActive && activeJ['alert'] != null && activeJ['alert']['responders'] != null) {
+          final List<dynamic> resps = activeJ['alert']['responders'];
+          _incomingResponders = resps.map((r) => {
+            'id': r['user']['_id'] ?? '',
+            'name': r['user']['name'] ?? '',
+            'phone': r['user']['phone'] ?? '',
+          }).toList();
+        }
       }
       _loading = false;
     });
@@ -389,6 +517,81 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     style: TextStyle(color: Colors.grey, fontSize: 11),
                   ),
                   const SizedBox(height: 32),
+                  
+                  if (_sosActive) ...[
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(Icons.security, color: successColor, size: 20),
+                              SizedBox(width: 8),
+                              Text('Rescue Coordination', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                            ],
+                          ),
+                          const Divider(color: Colors.white10, height: 24),
+                          if (_incomingResponders.isEmpty)
+                            const Text(
+                              'Waiting for nearby neighbors to respond...',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
+                            )
+                          else ...[
+                            Text(
+                              '${_incomingResponders.length} incoming responder(s):',
+                              style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 10),
+                            ..._incomingResponders.map((responder) {
+                              return Container(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: bgColor,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: Colors.white.withOpacity(0.06)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.person, color: successColor, size: 18),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            responder['name'] ?? 'Neighbor',
+                                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            'Phone: ${responder['phone'] ?? ''}',
+                                            style: const TextStyle(color: Colors.grey, fontSize: 11, fontFamily: 'monospace'),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Text(
+                                      'EN ROUTE',
+                                      style: TextStyle(color: successColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                  ],
 
                   // Active Journey Card
                   if (_activeJourney != null) ...[

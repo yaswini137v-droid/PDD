@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -29,12 +30,48 @@ class _JourneyScreenState extends State<JourneyScreen> {
   bool _loadingLocation = true;
   bool _submitting = false;
 
+  Timer? _debounceTimer;
+  List<Map<String, dynamic>> _suggestions = [];
+  bool _searchingPlaces = false;
+
   final List<Map<String, dynamic>> _mockSuggestions = [
     {'name': 'Bazar Street, Chittoor', 'lat': 13.2172, 'lng': 79.1003},
     {'name': 'OMR, Sholinganallur', 'lat': 12.9716, 'lng': 80.2454},
     {'name': 'Anna Nagar, Chennai', 'lat': 13.0850, 'lng': 80.2101},
     {'name': 'Giri Nagar, Chittoor', 'lat': 13.2201, 'lng': 79.1025},
   ];
+
+  @override
+  void dispose() {
+    _debounceTimer?.cancel();
+    _destNameController.dispose();
+    _vehicleController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounceTimer?.isActive ?? false) _debounceTimer!.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 600), () async {
+      if (query.trim().isEmpty) {
+        setState(() {
+          _suggestions = [];
+        });
+        return;
+      }
+      setState(() {
+        _searchingPlaces = true;
+      });
+      final results = await ApiService.searchPlaces(
+        query,
+        _currentPosition.latitude,
+        _currentPosition.longitude,
+      );
+      setState(() {
+        _suggestions = results;
+        _searchingPlaces = false;
+      });
+    });
+  }
 
   @override
   void initState() {
@@ -177,6 +214,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                       TextField(
                         controller: _destNameController,
                         style: const TextStyle(color: Colors.white),
+                        onChanged: _onSearchChanged,
                         decoration: InputDecoration(
                           hintText: 'Search destination...',
                           hintStyle: const TextStyle(color: Colors.grey),
@@ -186,24 +224,74 @@ class _JourneyScreenState extends State<JourneyScreen> {
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      // Suggestion pills
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: _mockSuggestions.map((sug) {
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: ActionChip(
-                                label: Text(sug['name']),
-                                labelStyle: const TextStyle(fontSize: 12, color: Colors.white),
-                                backgroundColor: bgColor,
-                                onPressed: () => _selectSuggestion(sug),
+                      if (_searchingPlaces)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8.0),
+                          child: Center(
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: accentColor,
                               ),
-                            );
-                          }).toList(),
+                            ),
+                          ),
                         ),
-                      )
+                      if (_suggestions.isNotEmpty)
+                        Container(
+                          constraints: const BoxConstraints(maxHeight: 180),
+                          margin: const EdgeInsets.only(top: 8),
+                          decoration: BoxDecoration(
+                            color: bgColor,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.withOpacity(0.2), width: 1),
+                          ),
+                          child: ListView.builder(
+                            shrinkWrap: true,
+                            physics: const ClampingScrollPhysics(),
+                            itemCount: _suggestions.length,
+                            itemBuilder: (context, index) {
+                              final sug = _suggestions[index];
+                              return ListTile(
+                                dense: true,
+                                title: Text(
+                                  sug['name'],
+                                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                leading: const Icon(Icons.location_on, color: accentColor, size: 18),
+                                onTap: () {
+                                  _selectSuggestion(sug);
+                                  setState(() {
+                                    _suggestions = [];
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                      if (_suggestions.isEmpty) ...[
+                        const SizedBox(height: 8),
+                        // Suggestion pills
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: _mockSuggestions.map((sug) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ActionChip(
+                                  label: Text(sug['name']),
+                                  labelStyle: const TextStyle(fontSize: 12, color: Colors.white),
+                                  backgroundColor: bgColor,
+                                  onPressed: () => _selectSuggestion(sug),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ]
                     ],
                   ),
                 ),
