@@ -255,6 +255,23 @@ router.post('/:id/respond', protect, async (req, res) => {
         alertId: alert._id,
         responders: updatedAlert.responders,
       });
+
+      // Send push notification to user in danger
+      User.findById(alert.user).then(userInDanger => {
+        if (userInDanger && userInDanger.fcmToken) {
+          sendPushNotification(
+            userInDanger.fcmToken,
+            '🛡️ Responder is on the way!',
+            `${req.user.name} has responded to your SOS and is on their way to help you.`,
+            {
+              type: 'responder_responding',
+              alertId: alert._id.toString(),
+              responderName: req.user.name,
+              responderPhone: req.user.phone,
+            }
+          );
+        }
+      }).catch(err => console.error('Error fetching user in danger for responder notification:', err));
     }
 
     res.json({ success: true, message: 'Marked as responding', data: updatedAlert });

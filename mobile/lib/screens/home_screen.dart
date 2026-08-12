@@ -43,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void dispose() {
     _locationUpdateTimer?.cancel();
+    _countdownTimer?.cancel();
     _rippleController?.dispose();
     super.dispose();
   }
@@ -372,12 +373,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  @override
-  void dispose() {
-    _countdownTimer?.cancel();
-    _rippleController?.dispose();
-    super.dispose();
-  }
+
 
   @override
   Widget build(BuildContext context) {
