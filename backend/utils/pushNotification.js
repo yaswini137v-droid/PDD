@@ -80,7 +80,8 @@ async function sendPushNotification(fcmToken, title, body, data = {}) {
       }
     };
 
-    const response = await admin.messaging().send(message);
+    const { getMessaging } = require('firebase-admin/messaging');
+    const response = await getMessaging().send(message);
     console.log('✅ Push notification sent successfully:', response);
     return response;
   } catch (error) {
