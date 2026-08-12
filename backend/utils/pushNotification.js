@@ -8,13 +8,20 @@ let firebaseInitialized = false;
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || path.join(__dirname, '../firebase-service-account.json');
 
 try {
-  if (fs.existsSync(serviceAccountPath)) {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    admin.initializeApp({
+      credential: admin.cert(serviceAccount)
+    });
+    firebaseInitialized = true;
+    console.log('✅ Firebase Admin SDK initialized successfully via environment variable.');
+  } else if (fs.existsSync(serviceAccountPath)) {
     const serviceAccount = require(serviceAccountPath);
     admin.initializeApp({
       credential: admin.cert(serviceAccount)
     });
     firebaseInitialized = true;
-    console.log('✅ Firebase Admin SDK initialized successfully.');
+    console.log('✅ Firebase Admin SDK initialized successfully via JSON file.');
   } else {
     console.warn(`\n================================================================================`);
     console.warn(`⚠️  Firebase Service Account Key not found at: ${serviceAccountPath}`);
