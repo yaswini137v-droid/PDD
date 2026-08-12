@@ -148,5 +148,24 @@ router.put('/location', protect, async (req, res) => {
   }
 });
 
+// @desc    Update user's FCM token
+// @route   PUT /api/auth/fcm-token
+// @access  Private
+router.put('/fcm-token', protect, async (req, res) => {
+  const { fcmToken } = req.body;
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    user.fcmToken = fcmToken;
+    await user.save();
+    res.json({ success: true, message: 'FCM token updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
 

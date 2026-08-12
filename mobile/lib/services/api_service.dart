@@ -84,6 +84,21 @@ class ApiService {
     await prefs.remove('token');
   }
 
+  static Future<bool> updateFcmToken(String fcmToken) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/auth/fcm-token'),
+        headers: await _headers(),
+        body: jsonEncode({'fcmToken': fcmToken}),
+      );
+      final data = jsonDecode(response.body);
+      return response.statusCode == 200 && data['success'] == true;
+    } catch (e) {
+      print('Error updating FCM token: $e');
+      return false;
+    }
+  }
+
   // Get active journey
   static Future<Map<String, dynamic>?> getActiveJourney() async {
     try {

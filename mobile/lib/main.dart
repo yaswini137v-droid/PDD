@@ -1,13 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/api_service.dart';
+import 'services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   // Initialize APIs and load saved tokens
   await ApiService.init();
+
+  // Initialize Firebase and Push Notifications
+  try {
+    await Firebase.initializeApp();
+    await PushNotificationService.initialize();
+  } catch (e) {
+    print('Firebase initialization failed: $e');
+  }
 
   runApp(const MyApp());
 }

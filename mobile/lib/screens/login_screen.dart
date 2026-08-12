@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/api_service.dart';
+import '../services/push_notification_service.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -47,6 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         if (result['success'] == true) {
+          // Upload FCM token to backend
+          PushNotificationService.uploadToken();
+
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(builder: (context) => const HomeScreen()),

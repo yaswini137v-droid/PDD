@@ -6,6 +6,7 @@ const Contact = require('../models/Contact');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const { sendEmergencyNotifications } = require('../utils/notification');
+const { sendPushNotification } = require('../utils/pushNotification');
 
 // @desc    Trigger a new SOS Alert
 // @route   POST /api/alerts/trigger
@@ -102,7 +103,35 @@ router.post('/trigger', protect, async (req, res) => {
           longitude,
           createdAt: alert.createdAt,
         });
+
+        // Send push notification to neighbor
+        if (neighbor.fcmToken) {
+          sendPushNotification(
+            neighbor.fcmToken,
+            '🚨 NEIGHBOR EMERGENCY ALERT',
+            `${req.user.name} is in danger nearby! Tap to see their location.`,
+            {
+              type: 'nearby_sos',
+              alertId: alert._id.toString(),
+              latitude: latitude.toString(),
+              longitude: longitude.toString(),
+            }
+          );
+        }
       });
+
+      // Send push notification to user themselves
+      if (req.user.fcmToken) {
+        sendPushNotification(
+          req.user.fcmToken,
+          '🚨 SOS ALERT TRIGGERED',
+          'An emergency alert has been sent to your guardians and nearby neighbors.',
+          {
+            type: 'sos_escalated',
+            alertId: alert._id.toString(),
+          }
+        );
+      }
     }
 
     res.status(201).json({

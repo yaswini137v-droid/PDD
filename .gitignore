@@ -22,3 +22,7 @@ mobile/android/app/release/
 .vscode/
 *.log
 *.iml
+
+# Credentials and secrets
+.env
+*firebase-service-account.json

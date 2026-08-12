@@ -41,6 +41,10 @@ const UserSchema = new mongoose.Schema({
       type: [Number], // [longitude, latitude]
     },
   },
+  fcmToken: {
+    type: String,
+    default: null,
+  },
 });
 
 UserSchema.index({ location: '2dsphere' });

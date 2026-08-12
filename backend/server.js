@@ -4,6 +4,7 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const { sendPushNotification } = require('./utils/pushNotification');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -71,7 +72,7 @@ setInterval(async () => {
     // Find journeys that are currently in progress or overdue
     const activeJourneys = await Journey.find({
       status: { $in: ['active', 'grace_period', 'check_in_requested'] }
-    }).populate('user', 'name phone email');
+    }).populate('user', 'name phone email fcmToken');
 
     for (let journey of activeJourneys) {
       if (!journey.user) continue; // Skip if user no longer exists
@@ -97,6 +98,19 @@ setInterval(async () => {
           message: 'Expected arrival time reached. Grace period started.',
           secondsRemaining: Math.max(0, Math.floor((journey.gracePeriodEndsAt - now) / 1000)),
         });
+
+        // Send Push Notification
+        if (user.fcmToken) {
+          sendPushNotification(
+            user.fcmToken,
+            '⚠️ Journey Grace Period Started',
+            'Expected arrival time reached. Please check in or extend your journey.',
+            {
+              type: 'grace_period',
+              journeyId: journey._id.toString()
+            }
+          );
+        }
       }
 
       // 2. Check if 'grace_period' has expired -> request safety MPIN check-in
@@ -118,6 +132,19 @@ setInterval(async () => {
           message: 'SAFETY CHECK-IN: Please enter your MPIN within 5 minutes or an SOS alert will be sent automatically.',
           secondsRemaining: 300, // 5 minutes
         });
+
+        // Send Push Notification
+        if (user.fcmToken) {
+          sendPushNotification(
+            user.fcmToken,
+            '🚨 Safety Check-in Required!',
+            'Please enter your MPIN within 5 minutes or an SOS alert will be sent automatically.',
+            {
+              type: 'mpin_prompt',
+              journeyId: journey._id.toString()
+            }
+          );
+        }
       }
 
       // 3. Check if 'check_in_requested' has expired -> ESCALATE TO SOS MODE
@@ -206,6 +233,21 @@ setInterval(async () => {
               longitude: alert.longitude,
               createdAt: alert.createdAt,
             });
+
+            // Send push notification to neighbor
+            if (neighbor.fcmToken) {
+              sendPushNotification(
+                neighbor.fcmToken,
+                '🚨 NEIGHBOR EMERGENCY ALERT',
+                `${user.name} is in danger nearby! Tap to see their location.`,
+                {
+                  type: 'nearby_sos',
+                  alertId: alert._id.toString(),
+                  latitude: alert.latitude.toString(),
+                  longitude: alert.longitude.toString()
+                }
+              );
+            }
           });
 
           // Notify the mobile client itself of emergency escalation
@@ -213,6 +255,19 @@ setInterval(async () => {
             alertId: alert._id,
             message: 'Emergency escalation triggered due to safety check-in timeout.',
           });
+
+          // Send Push Notification to user
+          if (user.fcmToken) {
+            sendPushNotification(
+              user.fcmToken,
+              '🚨 SOS ALERT TRIGGERED',
+              'An emergency alert has been sent to your guardians and nearby neighbors.',
+              {
+                type: 'sos_escalated',
+                alertId: alert._id.toString()
+              }
+            );
+          }
         }
       }
     }
