@@ -246,6 +246,14 @@ const Dashboard = () => {
           <span className="text-xs text-slate-500 font-bold hidden md:inline">
             Active session: <span className="text-blue-600 font-extrabold">{user?.name}</span>
           </span>
+          <Link
+            to="/profile"
+            className="px-4 py-2 text-xs font-extrabold text-slate-750 bg-slate-50 border border-slate-200 rounded-xl hover:bg-slate-100 transition-all flex items-center gap-1.5"
+            title="My Profile"
+          >
+            <Users className="w-4 h-4 text-slate-550" />
+            <span>Profile & Settings</span>
+          </Link>
           <button
             onClick={logout}
             className="p-2 bg-slate-50 border border-slate-200 rounded-xl hover:bg-red-50 hover:border-red-200 text-slate-500 hover:text-red-500 transition-all active:scale-95"

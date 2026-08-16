@@ -28,6 +28,18 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true, // 4-digit safety MPIN hashed
   },
+  gender: {
+    type: String,
+    default: '',
+  },
+  bloodGroup: {
+    type: String,
+    default: '',
+  },
+  dob: {
+    type: String,
+    default: '',
+  },
   createdAt: {
     type: Date,
     default: Date.now,

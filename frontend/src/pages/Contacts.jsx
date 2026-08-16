@@ -1,26 +1,50 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { UserCheck, Trash2, Plus, Users, ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const Contacts = () => {
-  const [contacts, setContacts] = useState([]);
-  const [formData, setFormData] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    relationship: '',
-  });
+  const [contactsData, setContactsData] = useState([
+    { id: '', name: '', phone: '', countryCode: '+91' },
+    { id: '', name: '', phone: '', countryCode: '+91' },
+    { id: '', name: '', phone: '', countryCode: '+91' }
+  ]);
   const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState({ text: '', type: '' });
   const { apiRequest } = useAuth();
 
   const fetchContacts = async () => {
     try {
       const res = await apiRequest('/api/contacts');
       if (res.success) {
-        setContacts(res.data);
+        const mapped = [
+          { id: '', name: '', phone: '', countryCode: '+91' },
+          { id: '', name: '', phone: '', countryCode: '+91' },
+          { id: '', name: '', phone: '', countryCode: '+91' }
+        ];
+        res.data.forEach((contact, idx) => {
+          if (idx < 3) {
+            let phone = contact.phone || '';
+            let code = '+91';
+            if (phone.startsWith('+91')) {
+              phone = phone.substring(3).trim();
+              code = '+91';
+            } else if (phone.startsWith('+')) {
+              if (phone.length > 3) {
+                code = phone.substring(0, 3);
+                phone = phone.substring(3).trim();
+              }
+            }
+            mapped[idx] = {
+              id: contact._id || '',
+              name: contact.name || '',
+              phone: phone,
+              countryCode: code
+            };
+          }
+        });
+        setContactsData(mapped);
       }
     } catch (err) {
       console.error(err);
@@ -33,198 +57,163 @@ const Contacts = () => {
     fetchContacts();
   }, []);
 
-  const handleInputChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+  const handleInputChange = (index, field, value) => {
+    const updated = [...contactsData];
+    updated[index][field] = value;
+    setContactsData(updated);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.name || !formData.phone) return;
-    setSubmitting(true);
-    setError('');
+    setMessage({ text: '', type: '' });
 
-    try {
-      const res = await apiRequest('/api/contacts', {
-        method: 'POST',
-        body: JSON.stringify(formData),
-      });
-
-      if (res.success) {
-        setFormData({ name: '', phone: '', email: '', relationship: '' });
-        fetchContacts();
-      } else {
-        setError(res.message);
+    // Validate: if Name is filled, Phone must be filled and vice versa
+    for (let i = 0; i < 3; i++) {
+      const { name, phone } = contactsData[i];
+      if ((name && !phone) || (!name && phone)) {
+        setMessage({ text: `Please fill both Name and Phone for Contact ${i + 1}`, type: 'error' });
+        return;
       }
-    } catch (err) {
-      console.error(err);
-      setError('Connection failure.');
-    } finally {
-      setSubmitting(false);
     }
-  };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Remove this emergency contact?')) return;
+    setSaving(true);
+
     try {
-      const res = await apiRequest(`/api/contacts/${id}`, {
-        method: 'DELETE',
-      });
-      if (res.success) {
-        fetchContacts();
+      for (let i = 0; i < 3; i++) {
+        const { id, name, phone, countryCode } = contactsData[i];
+        const fullPhone = phone ? `${countryCode}${phone}` : '';
+
+        if (name && phone) {
+          if (id) {
+            // Update existing contact
+            await apiRequest(`/api/contacts/${id}`, {
+              method: 'PUT',
+              body: JSON.stringify({ name, phone: fullPhone, relationship: `Contact ${i + 1}` }),
+            });
+          } else {
+            // Create new contact
+            await apiRequest('/api/contacts', {
+              method: 'POST',
+              body: JSON.stringify({ name, phone: fullPhone, relationship: `Contact ${i + 1}` }),
+            });
+          }
+        } else if (!name && !phone && id) {
+          // Delete removed contact
+          await apiRequest(`/api/contacts/${id}`, {
+            method: 'DELETE',
+          });
+        }
       }
+
+      setMessage({ text: 'Guardian contacts updated successfully!', type: 'success' });
+      await fetchContacts();
     } catch (err) {
       console.error(err);
+      setMessage({ text: 'Connection failure occurred while saving.', type: 'error' });
+    } finally {
+      setSaving(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#f4f7fa] text-slate-800 p-4 md:p-8 font-sans">
-      <div className="max-w-6xl mx-auto space-y-6">
-        
+    <div className="min-h-screen bg-[#121212] text-white p-6 md:p-12 font-sans relative overflow-hidden select-none">
+      {/* Background Glow */}
+      <div className="absolute top-[20%] right-[10%] w-[400px] h-[400px] rounded-full bg-[#FF6D6D]/5 blur-[100px] pointer-events-none"></div>
+
+      <div className="max-w-4xl mx-auto space-y-8 z-10 relative">
         {/* Navigation header */}
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <Link to="/" className="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-sm">
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
+            <Link to="/" className="p-3 bg-zinc-900 border border-zinc-800 rounded-xl hover:bg-zinc-800 transition-colors shadow-sm">
+              <ArrowLeft className="w-5 h-5 text-zinc-300" />
             </Link>
             <div>
-              <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">Emergency Contacts</h1>
-              <p className="text-sm text-slate-500 font-medium">Manage guardians who will be notified in safety emergencies</p>
+              <div className="flex items-center gap-2 text-[#FF6D6D] mb-0.5">
+                <Shield className="w-5 h-5" />
+                <span className="text-[10px] font-bold uppercase tracking-wider">Guard System</span>
+              </div>
+              <h1 className="text-3xl font-semibold tracking-tight text-white leading-none">Trusted Contacts</h1>
             </div>
           </div>
         </div>
 
-        {/* Main Grid split */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          
-          {/* Add form */}
-          <div className="glass-panel p-6 h-fit shadow-sm border border-slate-200/50">
-            <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-              <UserCheck className="w-5 h-5 text-blue-600" /> Add Guardian
-            </h2>
+        {message.text && (
+          <div className={`p-4 rounded-xl border text-sm text-center font-medium ${
+            message.type === 'success' 
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+              : 'bg-red-500/10 border-red-500/30 text-red-400'
+          }`}>
+            {message.text}
+          </div>
+        )}
 
-            {error && (
-              <div className="mb-4 p-3.5 bg-red-50 border border-red-200/60 text-red-600 rounded-xl text-xs font-semibold">
-                {error}
-              </div>
-            )}
+        {loading ? (
+          <div className="text-center py-20 text-zinc-500 text-sm">
+            <div className="w-8 h-8 border-4 border-zinc-800 border-t-[#FF6D6D] rounded-full animate-spin mx-auto mb-3"></div>
+            Loading guardians directory...
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {contactsData.map((contact, index) => (
+                <div 
+                  key={index}
+                  className="p-6 bg-zinc-900/40 border border-zinc-800/80 rounded-2xl space-y-6"
+                >
+                  <h3 className="text-sm font-semibold tracking-wider text-zinc-500 uppercase">
+                    CONTACT {index + 1}
+                  </h3>
+                  
+                  {/* Name field */}
+                  <div className="space-y-1">
+                    <input
+                      type="text"
+                      value={contact.name}
+                      onChange={(e) => handleInputChange(index, 'name', e.target.value)}
+                      placeholder="Name"
+                      className="w-full px-4 py-3 bg-transparent border border-zinc-800 focus:border-[#FF6D6D] text-white text-sm rounded-xl transition-all outline-none"
+                    />
+                  </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Full Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="Guardian's Name"
-                  className="w-full glass-input text-sm"
-                  required
-                />
-              </div>
+                  {/* Phone Row */}
+                  <div className="flex gap-3">
+                    <div className="flex items-center gap-1.5 px-3 py-3 bg-transparent border border-zinc-800 rounded-xl">
+                      <span className="text-base leading-none">🇮🇳</span>
+                      <span className="text-sm text-zinc-400 font-mono font-medium">{contact.countryCode}</span>
+                    </div>
+                    
+                    <input
+                      type="tel"
+                      value={contact.phone}
+                      onChange={(e) => handleInputChange(index, 'phone', e.target.value)}
+                      placeholder="Phone"
+                      className="flex-1 w-full px-4 py-3 bg-transparent border border-zinc-800 focus:border-[#FF6D6D] text-white text-sm rounded-xl transition-all outline-none"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Phone Number</label>
-                <input
-                  type="tel"
-                  name="phone"
-                  value={formData.phone}
-                  onChange={handleInputChange}
-                  placeholder="+91 98765 43210"
-                  className="w-full glass-input text-sm"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email Address</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  placeholder="guardian@example.com"
-                  className="w-full glass-input text-sm"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Relationship</label>
-                <input
-                  type="text"
-                  name="relationship"
-                  value={formData.relationship}
-                  onChange={handleInputChange}
-                  placeholder="Mother, Father, Spouse, Friend"
-                  className="w-full glass-input text-sm"
-                />
-              </div>
-
+            {/* Save Button */}
+            <div className="flex justify-end pt-4">
               <button
                 type="submit"
-                disabled={submitting}
-                className="w-full py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 text-white font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/10 hover:shadow-blue-600/20 text-sm mt-4"
+                disabled={saving}
+                className="w-full md:w-auto px-10 py-4 bg-[#FF6D6D] hover:bg-[#ff7e7e] disabled:bg-zinc-800 text-white text-base font-semibold rounded-full shadow-md shadow-[#FF6D6D]/10 hover:shadow-[#FF6D6D]/20 transition-all flex items-center justify-center gap-2"
               >
-                <Plus className="w-4 h-4" /> Add Guardian
+                {saving ? (
+                  <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+                ) : (
+                  'SAVE & CONTINUE'
+                )}
               </button>
-            </form>
-          </div>
-
-          {/* Grid listing existing contacts */}
-          <div className="md:col-span-2 space-y-4">
-            <div className="glass-panel p-6 shadow-sm border border-slate-200/50">
-              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3 mb-6">
-                <Users className="w-5 h-5 text-slate-400" /> Guardian Contacts Directory
-              </h2>
-
-              {loading ? (
-                <div className="text-center py-10 text-slate-400 text-sm">Loading guardians directory...</div>
-              ) : contacts.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 text-xs font-medium">
-                  No emergency contacts configured yet. Add at least one guardian above to receive SOS triggers!
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {contacts.map((contact) => (
-                    <div 
-                      key={contact._id}
-                      className="p-4 bg-white border border-slate-200/60 rounded-2xl flex justify-between items-start transition-all hover:scale-[1.01] shadow-sm"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-extrabold text-slate-800 text-base leading-none">{contact.name}</p>
-                          {contact.relationship && (
-                            <span className="text-[9px] bg-blue-600/10 border border-blue-600/20 text-blue-700 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                              {contact.relationship}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-500 font-mono pt-1">{contact.phone}</p>
-                        {contact.email && (
-                          <p className="text-xs text-slate-400 truncate">{contact.email}</p>
-                        )}
-                      </div>
-                      
-                      <button
-                        onClick={() => handleDelete(contact._id)}
-                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all flex-shrink-0"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          </div>
-
-        </div>
+          </form>
+        )}
       </div>
     </div>
   );
 };
 
 export default Contacts;
+

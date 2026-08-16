@@ -113,6 +113,9 @@ router.get('/me', protect, async (req, res) => {
         name: user.name,
         email: user.email,
         phone: user.phone,
+        gender: user.gender || '',
+        bloodGroup: user.bloodGroup || '',
+        dob: user.dob || '',
       },
     });
   } catch (error) {
@@ -161,6 +164,98 @@ router.put('/fcm-token', protect, async (req, res) => {
     user.fcmToken = fcmToken;
     await user.save();
     res.json({ success: true, message: 'FCM token updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Update user profile data
+// @route   PUT /api/auth/profile
+// @access  Private
+router.put('/profile', protect, async (req, res) => {
+  const { name, phone, gender, bloodGroup, dob } = req.body;
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    if (name !== undefined) user.name = name;
+    if (phone !== undefined) user.phone = phone;
+    if (gender !== undefined) user.gender = gender;
+    if (bloodGroup !== undefined) user.bloodGroup = bloodGroup;
+    if (dob !== undefined) user.dob = dob;
+
+    await user.save();
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        gender: user.gender,
+        bloodGroup: user.bloodGroup,
+        dob: user.dob,
+      }
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Change user password
+// @route   PUT /api/auth/change-password
+// @access  Private
+router.put('/change-password', protect, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  try {
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Please provide old and new password' });
+    }
+
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const isMatch = await user.matchPassword(oldPassword);
+    if (!isMatch) {
+      return res.status(400).json({ success: false, message: 'Incorrect old password' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @desc    Delete user account
+// @route   DELETE /api/auth/delete-account
+// @access  Private
+router.delete('/delete-account', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const Journey = require('../models/Journey');
+    const Alert = require('../models/Alert');
+    const Contact = require('../models/Contact');
+
+    await Journey.deleteMany({ user: req.user.id });
+    await Alert.deleteMany({ user: req.user.id });
+    await Contact.deleteMany({ user: req.user.id });
+    await user.deleteOne();
+
+    res.json({ success: true, message: 'Account deleted successfully' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Server error' });

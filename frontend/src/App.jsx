@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import Geofences from './pages/Geofences';
 import Contacts from './pages/Contacts';
 import SosTrigger from './pages/SosTrigger';
+import Profile from './pages/Profile';
 
 // Protected Route wrapper component
 const ProtectedRoute = ({ children }) => {
@@ -93,6 +94,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <SosTrigger />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               }
             />

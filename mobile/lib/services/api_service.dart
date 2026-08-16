@@ -329,6 +329,27 @@ class ApiService {
     }
   }
 
+  // Update Emergency Contact
+  static Future<bool> updateContact(String id, String name, String phone, String email, String relationship) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/contacts/$id'),
+        headers: await _headers(),
+        body: jsonEncode({
+          'name': name,
+          'phone': phone,
+          'email': email,
+          'relationship': relationship,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      return response.statusCode == 200 && data['success'] == true;
+    } catch (e) {
+      print('Error updating contact: $e');
+      return false;
+    }
+  }
+
   // Delete Emergency Contact
   static Future<bool> deleteContact(String id) async {
     try {
@@ -417,6 +438,92 @@ class ApiService {
     } catch (e) {
       return {'success': false, 'message': 'Network error: $e'};
     }
+  }
+
+  // Update User Profile details
+  static Future<Map<String, dynamic>> updateUserProfile({
+    required String name,
+    required String phone,
+    required String gender,
+    required String bloodGroup,
+    required String dob,
+  }) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/auth/profile'),
+        headers: await _headers(),
+        body: jsonEncode({
+          'name': name,
+          'phone': phone,
+          'gender': gender,
+          'bloodGroup': bloodGroup,
+          'dob': dob,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      return {
+        'success': response.statusCode == 200 && data['success'] == true,
+        'message': data['message'] ?? 'Profile update failed',
+        'data': data['data'],
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // Change user password
+  static Future<Map<String, dynamic>> changePassword(String oldPassword, String newPassword) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/auth/change-password'),
+        headers: await _headers(),
+        body: jsonEncode({
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        }),
+      );
+      final data = jsonDecode(response.body);
+      return {
+        'success': response.statusCode == 200 && data['success'] == true,
+        'message': data['message'] ?? 'Password update failed',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // Delete user account
+  static Future<Map<String, dynamic>> deleteAccount() async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/auth/delete-account'),
+        headers: await _headers(),
+      );
+      final data = jsonDecode(response.body);
+      return {
+        'success': response.statusCode == 200 && data['success'] == true,
+        'message': data['message'] ?? 'Delete account failed',
+      };
+    } catch (e) {
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // Get user journey history
+  static Future<List<dynamic>> getJourneyHistory() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/journey/history'),
+        headers: await _headers(),
+      );
+      final data = jsonDecode(response.body);
+      if (data['success'] == true) {
+        return data['data'] ?? [];
+      }
+    } catch (e) {
+      print('Error getting journey history: $e');
+    }
+    return [];
   }
 }
 

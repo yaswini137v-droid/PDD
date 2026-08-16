@@ -21,6 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _mpinController = TextEditingController();
 
   bool _loading = false;
+  bool _obscurePassword = true;
+  bool _rememberMe = false;
   String _errorMsg = '';
 
   Future<void> _submit() async {
@@ -76,189 +78,242 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Premium dark design system color scheme
-    const bgColor = Color(0xFF080B11);
-    const cardColor = Color(0xFF0F172A);
-    const accentColor = Color(0xFF3B82F6);
+    const bgColor = Color(0xFF121212);
+    const coralColor = Color(0xFFFF6D6D);
 
     return Scaffold(
       backgroundColor: bgColor,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // Logo Icon
-                const Icon(
-                  Icons.shield_outlined,
-                  size: 80,
-                  color: accentColor,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'TravelSafetySOS',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    fontFamily: 'Outfit',
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Title Header
+                  Text(
+                    _isLogin ? 'Sign In' : 'Sign Up',
+                    style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _isLogin ? 'Sign in to access safety tools' : 'Create a travel safety account',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey,
+                  const SizedBox(height: 8),
+                  Text(
+                    _isLogin ? 'Welcome back! Login to continue.' : 'Create an account to stay safe.',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white.withOpacity(0.5),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 32),
+                  const SizedBox(height: 36),
 
-                // Error alert box
-                if (_errorMsg.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
-                      border: Border.all(color: Colors.red.withOpacity(0.3)),
-                      borderRadius: BorderRadius.circular(8),
+                  // Error alert box
+                  if (_errorMsg.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withOpacity(0.1),
+                        border: Border.all(color: Colors.red.withOpacity(0.3)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _errorMsg,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                      ),
                     ),
-                    child: Text(
-                      _errorMsg,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                    const SizedBox(height: 16),
+                  ],
+
+                  // Form Fields
+                  if (!_isLogin) ...[
+                    TextFormField(
+                      controller: _nameController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                      ),
+                      validator: (val) => val!.isEmpty ? 'Name required' : null,
                     ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _phoneController,
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                        labelText: 'Phone Number',
+                      ),
+                      validator: (val) => val!.isEmpty ? 'Phone number required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  
+                  TextFormField(
+                    controller: _emailController,
+                    style: const TextStyle(color: Colors.white),
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                    ),
+                    validator: (val) => val!.contains('@') ? null : 'Enter a valid email',
                   ),
                   const SizedBox(height: 16),
-                ],
-
-                // Input fields Card
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: cardColor,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  
+                  TextFormField(
+                    controller: _passwordController,
+                    style: const TextStyle(color: Colors.white),
+                    obscureText: _obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Password',
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                          color: Colors.white.withOpacity(0.4),
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
+                    ),
+                    validator: (val) => val!.length >= 6 ? null : 'Password too short (min 6 chars)',
                   ),
-                  child: Column(
+                  
+                  if (!_isLogin) ...[
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _mpinController,
+                      style: const TextStyle(color: Colors.white, letterSpacing: 8),
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      maxLength: 4,
+                      textAlign: TextAlign.center,
+                      decoration: const InputDecoration(
+                        labelText: '4-Digit Security MPIN',
+                        counterText: '',
+                        labelStyle: TextStyle(color: Colors.grey, letterSpacing: 0),
+                      ),
+                      validator: (val) {
+                        if (val!.length != 4 || int.tryParse(val) == null) {
+                          return 'Enter a 4-digit number';
+                        }
+                        return null;
+                      },
+                    ),
+                  ],
+                  
+                  const SizedBox(height: 16),
+
+                  // Remember Me & Forgot Password Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      if (!_isLogin) ...[
-                        TextFormField(
-                          controller: _nameController,
-                          style: const TextStyle(color: Colors.white),
-                          decoration: const InputDecoration(
-                            labelText: 'Full Name',
-                            labelStyle: TextStyle(color: Colors.grey),
-                            prefixIcon: Icon(Icons.person, color: Colors.grey),
+                      Row(
+                        children: [
+                          Theme(
+                            data: Theme.of(context).copyWith(
+                              unselectedWidgetColor: Colors.white.withOpacity(0.3),
+                            ),
+                            child: Checkbox(
+                              value: _rememberMe,
+                              activeColor: coralColor,
+                              checkColor: Colors.white,
+                              onChanged: (val) {
+                                setState(() {
+                                  _rememberMe = val ?? false;
+                                });
+                              },
+                            ),
                           ),
-                          validator: (val) => val!.isEmpty ? 'Name required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _phoneController,
-                          style: const TextStyle(color: Colors.white),
-                          keyboardType: TextInputType.phone,
-                          decoration: const InputDecoration(
-                            labelText: 'Phone Number',
-                            labelStyle: TextStyle(color: Colors.grey),
-                            prefixIcon: Icon(Icons.phone, color: Colors.grey),
+                          Text(
+                            'Remember Me',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.6),
+                              fontSize: 14,
+                            ),
                           ),
-                          validator: (val) => val!.isEmpty ? 'Phone number required' : null,
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                      TextFormField(
-                        controller: _emailController,
-                        style: const TextStyle(color: Colors.white),
-                        keyboardType: TextInputType.emailAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Email Address',
-                          labelStyle: TextStyle(color: Colors.grey),
-                          prefixIcon: Icon(Icons.email, color: Colors.grey),
-                        ),
-                        validator: (val) => val!.contains('@') ? null : 'Enter a valid email',
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        style: const TextStyle(color: Colors.white),
-                        obscureText: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Password',
-                          labelStyle: TextStyle(color: Colors.grey),
-                          prefixIcon: Icon(Icons.lock, color: Colors.grey),
-                        ),
-                        validator: (val) => val!.length >= 6 ? null : 'Password too short (min 6 chars)',
-                      ),
-                      if (!_isLogin) ...[
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _mpinController,
-                          style: const TextStyle(color: Colors.white, letterSpacing: 8),
-                          obscureText: true,
-                          keyboardType: TextInputType.number,
-                          maxLength: 4,
-                          textAlign: TextAlign.center,
-                          decoration: const InputDecoration(
-                            labelText: '4-Digit Security MPIN',
-                            labelStyle: TextStyle(color: Colors.grey, letterSpacing: 0),
-                            prefixIcon: Icon(Icons.security, color: Colors.grey),
-                            counterText: '',
+                      TextButton(
+                        onPressed: () {
+                          // Forgot Password Action (Placeholder)
+                        },
+                        child: const Text(
+                          'Forgot Password?',
+                          style: TextStyle(
+                            color: coralColor,
+                            fontSize: 14,
                           ),
-                          validator: (val) {
-                            if (val!.length != 4 || int.tryParse(val) == null) {
-                              return 'Enter a 4-digit number';
-                            }
-                            return null;
-                          },
                         ),
-                      ],
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                ElevatedButton(
-                  onPressed: _loading ? null : _submit,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: accentColor,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                  // Submit Button
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _loading ? null : _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: coralColor,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28.0),
+                        ),
+                      ),
+                      child: _loading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              _isLogin ? 'Login' : 'Register',
+                              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+                            ),
                     ),
                   ),
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : Text(
-                          _isLogin ? 'Sign In' : 'Register',
-                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-                        ),
-                ),
-                const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _isLogin = !_isLogin;
-                      _errorMsg = '';
-                    });
-                  },
-                  child: Text(
-                    _isLogin ? 'Need an account? Register here' : 'Already have an account? Sign in',
-                    style: const TextStyle(color: accentColor),
+                  // Bottom Toggle Text
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _isLogin ? "Don't have an account? " : "Already have an account? ",
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.6),
+                          fontSize: 14,
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _isLogin = !_isLogin;
+                            _errorMsg = '';
+                          });
+                        },
+                        child: Text(
+                          _isLogin ? 'Sign Up' : 'Sign In',
+                          style: const TextStyle(
+                            color: coralColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -266,3 +321,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+

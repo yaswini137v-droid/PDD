@@ -62,10 +62,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', json.data.token);
       setToken(json.data.token);
       setUser({
-        _id: json.data._id,
-        name: json.data.name,
-        email: json.data.email,
-        phone: json.data.phone,
+        ...json.data,
       });
       return { success: true };
     } else {
@@ -88,10 +85,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('token', json.data.token);
       setToken(json.data.token);
       setUser({
-        _id: json.data._id,
-        name: json.data.name,
-        email: json.data.email,
-        phone: json.data.phone,
+        ...json.data,
       });
       return { success: true };
     } else {
@@ -122,6 +116,34 @@ export const AuthProvider = ({ children }) => {
     return await response.json();
   };
 
+  const updateProfile = async (profileData) => {
+    const res = await apiRequest('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData),
+    });
+    if (res.success) {
+      setUser(res.data);
+    }
+    return res;
+  };
+
+  const changePassword = async (oldPassword, newPassword) => {
+    return await apiRequest('/api/auth/change-password', {
+      method: 'PUT',
+      body: JSON.stringify({ oldPassword, newPassword }),
+    });
+  };
+
+  const deleteAccount = async () => {
+    const res = await apiRequest('/api/auth/delete-account', {
+      method: 'DELETE',
+    });
+    if (res.success) {
+      logout();
+    }
+    return res;
+  };
+
   const value = {
     user,
     token,
@@ -130,6 +152,9 @@ export const AuthProvider = ({ children }) => {
     register,
     logout,
     apiRequest,
+    updateProfile,
+    changePassword,
+    deleteAccount,
     isAuthenticated: !!user,
   };
 

@@ -10,6 +10,7 @@ import 'contacts_screen.dart';
 import 'geofence_screen.dart';
 import 'mpin_checkin_screen.dart';
 import 'responder_map_screen.dart';
+import 'profile_screen.dart';
 import 'package:geolocator/geolocator.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -20,10 +21,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  // Navigation tabs
+  int _currentTabIndex = 0;
+
   // SOS trigger state variables
   bool _sosActive = false;
   bool _countingDown = false;
-  int _countdownSeconds = 3;
+  int _countdownSeconds = 5; // Default from mockup settings
   Timer? _countdownTimer;
   
   Map<String, dynamic>? _activeJourney;
@@ -39,6 +43,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   AnimationController? _rippleController;
   Timer? _locationUpdateTimer;
   List<Map<String, dynamic>> _incomingResponders = [];
+
+  // History state variables
+  List<dynamic> _historyJourneys = [];
+  bool _historyLoading = false;
 
   @override
   void dispose() {
@@ -66,10 +74,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       _userName = prefs.getString('userName') ?? 'Traveler';
+      _countdownSeconds = prefs.getInt('countdownDuration') ?? 5;
     });
 
     // Check active status on server
     await _syncActiveData();
+
+    // Load initial history logs
+    _loadHistory();
 
     // Initialize Native MethodChannel hooks
     await LocationServiceWrapper.init();
@@ -130,7 +142,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       SocketService.onNearbySosAlert = (data) {
         print('Nearby SOS alert WebSocket received: $data');
         if (mounted) {
-          // Show overlay dialog
           showDialog(
             context: context,
             barrierDismissible: false,
@@ -200,15 +211,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       };
     }
 
-    // Request permissions and start periodic user active location updates
     _startPeriodicLocationUpdates();
   }
 
   Future<void> _startPeriodicLocationUpdates() async {
-    // Run once immediately
     _reportLocation();
-    
-    // Then run every 40 seconds
     _locationUpdateTimer = Timer.periodic(const Duration(seconds: 40), (timer) {
       _reportLocation();
     });
@@ -239,7 +246,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       _loading = true;
     });
 
-    // Load user details
     try {
       final profile = await ApiService.getUserProfile();
       if (profile != null) {
@@ -261,7 +267,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         _currLat = activeJ['currentLatitude'] ?? 0.0;
         _currLng = activeJ['currentLongitude'] ?? 0.0;
         
-        // Populate responders if journey is already in SOS mode
         if (_sosActive && activeJ['alert'] != null && activeJ['alert']['responders'] != null) {
           final List<dynamic> resps = activeJ['alert']['responders'];
           _incomingResponders = resps.map((r) => {
@@ -275,7 +280,17 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     });
   }
 
-  // SOS button click countdown
+  Future<void> _loadHistory() async {
+    setState(() {
+      _historyLoading = true;
+    });
+    final hist = await ApiService.getJourneyHistory();
+    setState(() {
+      _historyJourneys = hist;
+      _historyLoading = false;
+    });
+  }
+
   void _toggleSOSButton() {
     if (_sosActive) {
       _resolveSOSAlert();
@@ -291,21 +306,27 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _startSOSCountdown() {
     setState(() {
       _countingDown = true;
-      _countdownSeconds = 3;
     });
 
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_countdownSeconds > 1) {
-        setState(() {
-          _countdownSeconds--;
-        });
-      } else {
-        _countdownTimer?.cancel();
-        setState(() {
-          _countingDown = false;
-        });
-        _dispatchSOS();
-      }
+    // Check saved countdown timer value
+    SharedPreferences.getInstance().then((prefs) {
+      setState(() {
+        _countdownSeconds = prefs.getInt('countdownDuration') ?? 5;
+      });
+      
+      _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_countdownSeconds > 1) {
+          setState(() {
+            _countdownSeconds--;
+          });
+        } else {
+          _countdownTimer?.cancel();
+          setState(() {
+            _countingDown = false;
+          });
+          _dispatchSOS();
+        }
+      });
     });
   }
 
@@ -354,6 +375,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       await ApiService.completeJourney();
       await LocationServiceWrapper.stopTracking();
       await _syncActiveData();
+      _loadHistory();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Journey Completed safely!'), backgroundColor: Colors.green),
       );
@@ -362,380 +384,460 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     }
   }
 
-  Future<void> _handleLogout() async {
-    await ApiService.logout();
-    SocketService.disconnect();
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
-    }
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Good Morning 👋';
+    if (hour >= 12 && hour < 17) return 'Good Afternoon 👋';
+    if (hour >= 17 && hour < 21) return 'Good Evening 👋';
+    return 'Good Night 👋';
   }
 
-
-
-  @override
-  Widget build(BuildContext context) {
-    const bgColor = Color(0xFF080B11);
-    const cardColor = Color(0xFF0F172A);
+  // Dashboard view matching mockup
+  Widget _buildDashboard() {
+    const coralColor = Color(0xFFFF6D6D);
     const dangerColor = Color(0xFFEF4444);
-    const successColor = Color(0xFF10B981);
-    const accentColor = Color(0xFF3B82F6);
 
-    return Scaffold(
-      backgroundColor: bgColor,
-      appBar: AppBar(
-        title: const Text('TravelSafetySOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: cardColor,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _syncActiveData,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.grey),
-            onPressed: _handleLogout,
-          ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: accentColor))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Greeting Header row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Welcome header
-                  Row(
-                    children: [
-                      const CircleAvatar(
-                        backgroundColor: Color(0x203B82F6),
-                        child: Icon(Icons.person, color: accentColor),
-                      ),
-                      const SizedBox(width: 12),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('SAFETY SCAN STATUS', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.2)),
-                          Text(
-                            _sosActive ? '🚨 EMERGENCY ALARM ACTIVE' : '🛡️ YOU ARE PROTECTED',
-                            style: TextStyle(
-                              color: _sosActive ? dangerColor : successColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Text(
+                    _getGreeting(),
+                    style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
-                  const SizedBox(height: 32),
-
-                  // Giant SOS Ripple Button Layout
-                  Center(
-                    child: AnimatedBuilder(
-                      animation: _rippleController!,
-                      builder: (context, child) {
-                        return Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Ripples when active or counting down
-                            if (_sosActive || _countingDown) ...[
-                              Container(
-                                width: 220 + (_rippleController!.value * 40),
-                                height: 220 + (_rippleController!.value * 40),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: (_sosActive ? dangerColor : accentColor).withOpacity(0.12 * (1 - _rippleController!.value)),
-                                ),
-                              ),
-                              Container(
-                                width: 180 + (_rippleController!.value * 30),
-                                height: 180 + (_rippleController!.value * 30),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: (_sosActive ? dangerColor : accentColor).withOpacity(0.18 * (1 - _rippleController!.value)),
-                                ),
-                              ),
-                            ],
-                            
-                            // Core Button Gesture Wrapper
-                            GestureDetector(
-                              onTap: _toggleSOSButton,
-                              child: Container(
-                                width: 170,
-                                height: 170,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: _sosActive ? dangerColor : (_countingDown ? accentColor : dangerColor.withOpacity(0.85)),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (_sosActive ? dangerColor : (_countingDown ? accentColor : dangerColor)).withOpacity(0.35),
-                                      blurRadius: 16,
-                                      spreadRadius: 4,
-                                    ),
-                                  ],
-                                ),
-                                alignment: Alignment.center,
-                                child: _countingDown
-                                    ? Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            '$_countdownSeconds',
-                                            style: const TextStyle(color: Colors.white, fontSize: 42, fontWeight: FontWeight.bold),
-                                          ),
-                                          const Text('TAP CANCEL', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                        ],
-                                      )
-                                    : Text(
-                                        _sosActive ? 'RESOLVE' : 'SOS',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 34,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 1.5,
-                                        ),
-                                      ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Tap SOS to trigger emergency response or hold cancel if accidental.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey, fontSize: 11),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  if (_sosActive) ...[
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.red.withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.security, color: successColor, size: 20),
-                              SizedBox(width: 8),
-                              Text('Rescue Coordination', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                            ],
-                          ),
-                          const Divider(color: Colors.white10, height: 24),
-                          if (_incomingResponders.isEmpty)
-                            const Text(
-                              'Waiting for nearby neighbors to respond...',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
-                            )
-                          else ...[
-                            Text(
-                              '${_incomingResponders.length} incoming responder(s):',
-                              style: const TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-                            ),
-                            const SizedBox(height: 10),
-                            ..._incomingResponders.map((responder) {
-                              return Container(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: bgColor,
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.white.withOpacity(0.06)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.person, color: successColor, size: 18),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            responder['name'] ?? 'Neighbor',
-                                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            'Phone: ${responder['phone'] ?? ''}',
-                                            style: const TextStyle(color: Colors.grey, fontSize: 11, fontFamily: 'monospace'),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const Text(
-                                      'EN ROUTE',
-                                      style: TextStyle(color: successColor, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                  ],
-
-                  // Active Journey Card
-                  if (_activeJourney != null) ...[
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.06)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          const Row(
-                            children: [
-                              Icon(Icons.directions_run, color: accentColor, size: 20),
-                              SizedBox(width: 8),
-                              Text('Active Travel Journey', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                            ],
-                          ),
-                          const Divider(color: Colors.white10, height: 24),
-                          
-                          Text(
-                            'Destination: ${_activeJourney!['destinationName']}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Text('Travel: ${_activeJourney!['travelMode']}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                              if (_activeJourney!['vehicleNumber'] != null) ...[
-                                const SizedBox(width: 12),
-                                Text('Vehicle: ${_activeJourney!['vehicleNumber']}', style: const TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'monospace')),
-                              ]
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          
-                          // Telemetry stats row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                'Telemetry: (${_currLat.toStringAsFixed(4)}, ${_currLng.toStringAsFixed(4)})',
-                                style: const TextStyle(color: Colors.grey, fontSize: 11, fontFamily: 'monospace'),
-                              ),
-                              Text(
-                                'Dist: ${_distanceToDest.toInt()}m',
-                                style: const TextStyle(color: Colors.pinkAccent, fontSize: 12, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => _dispatchSOS(triggerType: 'manual_sos'),
-                                  style: OutlinedButton.styleFrom(
-                                    side: const BorderSide(color: dangerColor),
-                                  ),
-                                  child: const Text('Force SOS Alert', style: TextStyle(color: dangerColor)),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: _endJourney,
-                                  style: ElevatedButton.styleFrom(backgroundColor: successColor),
-                                  child: const Text('End Travel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                ),
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // Options Menu List
-                  const Text('CRITICAL FEATURES', style: TextStyle(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
-                  const SizedBox(height: 8),
-                  
-                  // Feature Tiles
-                  Card(
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      leading: const Icon(Icons.explore, color: accentColor),
-                      title: const Text('Plan / Start Journey', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Search destinations and map geofences', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                      onTap: () {
-                        if (_activeJourney != null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('You are already traveling. Complete current trip first.')),
-                          );
-                          return;
-                        }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const JourneyScreen()),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  Card(
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      leading: const Icon(Icons.home, color: successColor),
-                      title: const Text('Configure Safe Places', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Define permanent geofence zones', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const GeofenceScreen()),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  Card(
-                    color: cardColor,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: ListTile(
-                      leading: const Icon(Icons.people, color: Colors.orangeAccent),
-                      title: const Text('Emergency Guardians', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      subtitle: const Text('Register guardian contact directories', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.grey),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const ContactsScreen()),
-                        );
-                      },
-                    ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Stay safe. We\'re here for you.',
+                    style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.5)),
                   ),
                 ],
               ),
+              GestureDetector(
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                  );
+                  _syncActiveData();
+                },
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF8A8A),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.person, color: Colors.white, size: 24),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+
+          // Safe Banner Card
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+            decoration: BoxDecoration(
+              color: _sosActive ? const Color(0xFF3D1B1B) : const Color(0xFFE9F7F2),
+              borderRadius: BorderRadius.circular(20),
             ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: _sosActive ? Colors.red.withOpacity(0.2) : const Color(0xFFC8E6C9),
+                  radius: 24,
+                  child: Icon(
+                    _sosActive ? Icons.warning : Icons.security,
+                    color: _sosActive ? Colors.redAccent : const Color(0xFF2E7D32),
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _sosActive ? 'Emergency Alert!' : 'You\'re Safe',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _sosActive ? Colors.redAccent : const Color(0xFF1B5E20),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _sosActive ? 'Rescue coordination active.' : 'No active emergency',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _sosActive ? Colors.redAccent.withOpacity(0.8) : const Color(0xFF388E3C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // SOS Dispatch Section
+          const Text(
+            'Emergency',
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 12),
+          GestureDetector(
+            onTap: _toggleSOSButton,
+            child: Container(
+              height: 90,
+              decoration: BoxDecoration(
+                color: _sosActive ? dangerColor : (_countingDown ? Colors.amber : coralColor),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: (_sosActive ? dangerColor : coralColor).withOpacity(0.2),
+                    blurRadius: 10,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              alignment: Alignment.center,
+              child: _countingDown
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'Sending SOS in $_countdownSeconds seconds (Tap to Cancel)',
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _sosActive ? Icons.check_circle_outline : Icons.warning_amber_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _sosActive ? 'RESOLVE SOS' : 'SOS',
+                          style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // Rescue coordination en-route logs
+          if (_sosActive && _incomingResponders.isNotEmpty) ...[
+            const Text(
+              'Rescue Coordination Logs',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 12),
+            ..._incomingResponders.map((resp) {
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E1E1E),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.green.withOpacity(0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield, color: Colors.green),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(resp['name'] ?? 'Responder', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                          Text('Phone: ${resp['phone']}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    const Text('EN ROUTE', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 11)),
+                  ],
+                ),
+              );
+            }).toList(),
+            const SizedBox(height: 24),
+          ],
+
+          // Current Journey Section
+          const Text(
+            'Current Journey',
+            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 12),
+
+          if (_activeJourney == null)
+            GestureDetector(
+              onTap: () async {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const JourneyScreen()),
+                );
+                _syncActiveData();
+              },
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1E),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 50,
+                      height: 50,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFFFE8E8),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.location_on, color: coralColor, size: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'No active journey',
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            'Start a journey when you\'re travelling',
+                            style: TextStyle(color: Colors.grey, fontSize: 13),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(Icons.chevron_right, color: Colors.grey),
+                  ],
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.white.withOpacity(0.06)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Destination: ${_activeJourney!['destinationName']}',
+                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text('Mode: ${_activeJourney!['travelMode']}', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+                      if (_activeJourney!['vehicleNumber'] != null) ...[
+                        const SizedBox(width: 16),
+                        Text('Vehicle: ${_activeJourney!['vehicleNumber']}', style: const TextStyle(color: Colors.grey, fontSize: 13, fontFamily: 'monospace')),
+                      ]
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Grace expires: ${new DateFormat("hh:mm a").format(DateTime.parse(_activeJourney!['gracePeriodEndsAt']))}',
+                    style: const TextStyle(color: Colors.orangeAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => _dispatchSOS(triggerType: 'manual_sos'),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: dangerColor),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('Force SOS Alert', style: TextStyle(color: dangerColor)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _endJourney,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          child: const Text('End Travel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  )
+                ],
+              ),
+            ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // History tab view
+  Widget _buildHistoryTab() {
+    const coralColor = Color(0xFFFF6D6D);
+    if (_historyLoading) {
+      return const Center(child: CircularProgressIndicator(color: coralColor));
+    }
+
+    if (_historyJourneys.isEmpty) {
+      return const Center(
+        child: Text(
+          'No travel history logs recorded.',
+          style: TextStyle(color: Colors.grey, fontSize: 14),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _historyJourneys.length,
+      itemBuilder: (context, index) {
+        final j = _historyJourneys[index];
+        final created = DateTime.parse(j['createdAt']);
+        final formattedDate = "${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')}";
+        final status = j['status'] ?? 'completed';
+
+        return Card(
+          color: const Color(0xFF1E1E1E),
+          margin: const EdgeInsets.only(bottom: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          child: ListTile(
+            title: Text(
+              j['destinationName'] ?? 'Journey',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 4),
+                Text('Date: $formattedDate  |  Mode: ${j['travelMode'] ?? 'N/A'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                if (j['vehicleNumber'] != null && j['vehicleNumber'].isNotEmpty)
+                  Text('Vehicle: ${j['vehicleNumber']}', style: const TextStyle(color: Colors.grey, fontSize: 12, fontFamily: 'monospace')),
+              ],
+            ),
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: status == 'completed' ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                border: Border.all(color: status == 'completed' ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2)),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                status.toUpperCase(),
+                style: TextStyle(
+                  color: status == 'completed' ? Colors.green : Colors.red,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const bgColor = Color(0xFF121212);
+    const coralColor = Color(0xFFFF6D6D);
+
+    return Scaffold(
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: _loading && _currentTabIndex == 0
+            ? const Center(child: CircularProgressIndicator(color: coralColor))
+            : IndexedStack(
+                index: _currentTabIndex,
+                children: [
+                  _buildDashboard(),
+                  const GeofenceScreen(),
+                  _buildHistoryTab(),
+                ],
+              ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentTabIndex,
+        backgroundColor: const Color(0xFF1E1E1E),
+        selectedItemColor: coralColor,
+        unselectedItemColor: Colors.grey,
+        selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+        unselectedLabelStyle: const TextStyle(fontSize: 12),
+        onTap: (index) {
+          setState(() {
+            _currentTabIndex = index;
+          });
+          if (index == 2) {
+            _loadHistory();
+          } else if (index == 0) {
+            _syncActiveData();
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shield_outlined),
+            activeIcon: Icon(Icons.shield),
+            label: 'SafeZone',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.location_on_outlined),
+            activeIcon: Icon(Icons.location_on),
+            label: 'Geofence',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history_toggle_off),
+            activeIcon: Icon(Icons.history),
+            label: 'History',
+          ),
+        ],
+      ),
     );
   }
 }
+
+// Simple Helper for Date Formatting inside files
+class DateFormat {
+  final String formatPattern;
+  DateFormat(this.formatPattern);
+
+  String format(DateTime date) {
+    final hour = date.hour;
+    final min = date.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    return "$displayHour:$min $period";
+  }
+}
+
 // wait! _toggleSOSButton calls resolve if active, or starts countdown if not active. This is extremely robust.

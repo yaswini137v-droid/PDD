@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/api_service.dart';
@@ -11,6 +13,10 @@ void main() async {
   // Initialize APIs and load saved tokens
   await ApiService.init();
 
+  // Check onboarding status
+  final prefs = await SharedPreferences.getInstance();
+  final bool onboarded = prefs.getBool('onboarded') ?? false;
+
   // Initialize Firebase and Push Notifications
   try {
     await Firebase.initializeApp();
@@ -19,11 +25,12 @@ void main() async {
     print('Firebase initialization failed: $e');
   }
 
-  runApp(const MyApp());
+  runApp(MyApp(onboarded: onboarded));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool onboarded;
+  const MyApp({super.key, required this.onboarded});
 
   @override
   Widget build(BuildContext context) {
@@ -35,31 +42,34 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        primaryColor: const Color(0xFF3B82F6),
-        scaffoldBackgroundColor: const Color(0xFF080B11),
+        primaryColor: const Color(0xFFFF6D6D),
+        scaffoldBackgroundColor: const Color(0xFF121212),
         fontFamily: 'sans-serif',
         
         // Input decoration theme styling
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
-          fillColor: const Color(0xFF0F172A).withOpacity(0.5),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          fillColor: Colors.transparent,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.white.withOpacity(0.08)),
+            borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5),
+            borderSide: const BorderSide(color: Color(0xFFFF6D6D), width: 1.5),
           ),
-          labelStyle: const TextStyle(color: Colors.grey, fontSize: 13),
+          labelStyle: const TextStyle(color: Colors.grey, fontSize: 14),
         ),
       ),
-      home: isLoggedIn ? const HomeScreen() : const LoginScreen(),
+      home: isLoggedIn 
+          ? const HomeScreen() 
+          : (onboarded ? const LoginScreen() : const OnboardingScreen()),
     );
   }
 }
+

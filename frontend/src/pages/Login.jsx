@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Shield, Key, Mail, User, Phone, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Shield } from 'lucide-react';
 
 const Login = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -14,6 +14,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   
   const { login, register } = useAuth();
 
@@ -68,179 +69,163 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#f4f7fa] p-4 font-sans">
-      {/* Decorative colored glow fields */}
-      <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] rounded-full bg-blue-200/40 blur-[120px] pointer-events-none"></div>
-      <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] rounded-full bg-pink-100/40 blur-[120px] pointer-events-none"></div>
+    <div className="min-h-screen flex items-center justify-center bg-[#121212] text-white p-6 font-sans relative overflow-hidden select-none">
+      {/* Background glow */}
+      <div className="absolute top-[30%] left-[50%] -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full bg-[#FF6D6D]/5 blur-[100px] pointer-events-none"></div>
 
-      <div className="w-full max-w-md glass-panel glass-panel-glow p-8 relative z-10">
-        
-        {/* Header Logo Section */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 bg-blue-600/10 border border-blue-600/20 rounded-2xl mb-3">
-            <Shield className="w-7 h-7 text-blue-600" />
+      <div className="w-full max-w-md space-y-8 z-10">
+        {/* Title Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-[#FF6D6D] mb-1">
+            <Shield className="w-6 h-6" />
+            <span className="text-sm font-semibold tracking-wide uppercase">TravelSafetySOS</span>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 leading-none">TravelSafetySOS</h1>
-          <p className="text-xs text-slate-500 mt-2 font-medium">Real-time Emergency Response & Trip Monitoring</p>
-        </div>
-
-        {/* Tab Selection */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/80 mb-6">
-          <button
-            type="button"
-            onClick={() => { setIsLogin(true); setError(''); }}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200 ${
-              isLogin ? 'bg-white text-blue-600 shadow-sm border border-slate-200/30' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            type="button"
-            onClick={() => { setIsLogin(false); setError(''); }}
-            className={`flex-1 py-2.5 text-xs font-bold rounded-lg transition-all duration-200 ${
-              !isLogin ? 'bg-white text-blue-600 shadow-sm border border-slate-200/30' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            Create Account
-          </button>
+          <h1 className="text-4xl font-semibold tracking-tight">
+            {isLogin ? 'Sign In' : 'Sign Up'}
+          </h1>
+          <p className="text-sm text-zinc-400">
+            {isLogin ? 'Welcome back! Login to continue.' : 'Create an account to stay safe.'}
+          </p>
         </div>
 
         {error && (
-          <div className="mb-5 p-3.5 bg-red-50 border border-red-200/60 text-red-600 rounded-xl text-xs font-semibold text-center">
+          <div className="p-4 bg-red-500/10 border border-red-500/30 text-red-400 rounded-xl text-sm text-center">
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {!isLogin && (
             <>
               {/* Full Name */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Full Name</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                    <User className="w-4.5 h-4.5 text-slate-400" />
-                  </span>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="Enter your full name"
-                    className="w-full glass-input pl-10 pr-4 text-sm"
-                    required
-                  />
-                </div>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="Full Name"
+                  className="w-full px-4 py-4 bg-transparent border border-zinc-800 focus:border-[#FF6D6D] text-white text-base rounded-xl transition-all outline-none"
+                  required
+                />
               </div>
 
               {/* Phone Number */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Phone Number</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                    <Phone className="w-4.5 h-4.5 text-slate-400" />
-                  </span>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    placeholder="+91 90000 00000"
-                    className="w-full glass-input pl-10 pr-4 text-sm"
-                    required
-                  />
-                </div>
+                <input
+                  type="tel"
+                  name="phone"
+                  value={formData.phone}
+                  onChange={handleInputChange}
+                  placeholder="Phone Number"
+                  className="w-full px-4 py-4 bg-transparent border border-zinc-800 focus:border-[#FF6D6D] text-white text-base rounded-xl transition-all outline-none"
+                  required
+                />
               </div>
             </>
           )}
 
           {/* Email */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Email Address</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                <Mail className="w-4.5 h-4.5 text-slate-400" />
-              </span>
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="you@example.com"
-                className="w-full glass-input pl-10 pr-4 text-sm"
-                required
-              />
-            </div>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              placeholder="Email"
+              className="w-full px-4 py-4 bg-transparent border border-zinc-800 focus:border-[#FF6D6D] text-white text-base rounded-xl transition-all outline-none"
+              required
+            />
           </div>
 
           {/* Password */}
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Password</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                <Key className="w-4.5 h-4.5 text-slate-400" />
-              </span>
-              <input
-                type={showPassword ? "text" : "password"}
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                placeholder="Enter password"
-                className="w-full glass-input pl-10 pr-10 text-sm"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
-              >
-                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-              </button>
-            </div>
+          <div className="space-y-1 relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              placeholder="Password"
+              className="w-full px-4 py-4 bg-transparent border border-zinc-800 focus:border-[#FF6D6D] text-white text-base rounded-xl transition-all outline-none pr-12"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
+            >
+              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+            </button>
           </div>
 
           {!isLogin && (
             /* MPIN */
             <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">4-Digit Security MPIN</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
-                  <Shield className="w-4.5 h-4.5 text-slate-400" />
-                </span>
-                <input
-                  type="password"
-                  name="mpin"
-                  value={formData.mpin}
-                  onChange={handleInputChange}
-                  placeholder="1234"
-                  maxLength={4}
-                  pattern="[0-9]{4}"
-                  className="w-full glass-input pl-10 pr-4 text-center tracking-[0.6em] font-mono text-base font-bold"
-                  required
-                />
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">Required to check in and verify your safety on countdown alerts.</p>
+              <input
+                type="password"
+                name="mpin"
+                value={formData.mpin}
+                onChange={handleInputChange}
+                placeholder="4-Digit Security MPIN"
+                maxLength={4}
+                pattern="[0-9]{4}"
+                className="w-full px-4 py-4 bg-transparent border border-zinc-800 focus:border-[#FF6D6D] text-white text-base rounded-xl transition-all outline-none text-center tracking-[0.5em] font-mono"
+                required
+              />
             </div>
           )}
+
+          {/* Remember Me and Forgot Password Row */}
+          <div className="flex items-center justify-between text-sm pt-1">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded border-zinc-800 bg-transparent text-[#FF6D6D] focus:ring-0 focus:ring-offset-0"
+              />
+              <span className="text-zinc-400">Remember Me</span>
+            </label>
+            <button
+              type="button"
+              className="text-[#FF6D6D] hover:text-[#ff7e7e] transition-all"
+            >
+              Forgot Password?
+            </button>
+          </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-6 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl shadow-md shadow-blue-600/15 hover:shadow-blue-600/25 active:scale-[0.98] transition-all duration-150 flex items-center justify-center gap-2"
+            className="w-full mt-6 py-4 bg-[#FF6D6D] hover:bg-[#ff7e7e] disabled:bg-zinc-800 text-white text-lg font-medium rounded-full shadow-md shadow-[#FF6D6D]/10 hover:shadow-[#FF6D6D]/20 transition-all flex items-center justify-center gap-2"
           >
             {loading ? (
-              <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
+              <div className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
             ) : isLogin ? (
-              'Sign In'
+              'Login'
             ) : (
-              'Create Account'
+              'Register'
             )}
           </button>
         </form>
+
+        {/* Toggle Mode */}
+        <div className="text-center text-sm text-zinc-400 pt-2">
+          {isLogin ? "Don't have an account? " : "Already have an account? "}
+          <button
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+            }}
+            className="text-[#FF6D6D] hover:text-[#ff7e7e] font-semibold ml-1 transition-all"
+          >
+            {isLogin ? 'Sign Up' : 'Sign In'}
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
 export default Login;
+
