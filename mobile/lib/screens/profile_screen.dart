@@ -68,7 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             '2. Plan a journey by setting a destination and geofence boundary.\n\n'
             '3. If you leave the geofence boundary or exceed the journey arrival timer without checking in via your secure MPIN, an emergency alert is triggered.\n\n'
             '4. During an emergency, your real-time location is shared with your guardians and nearby responders.',
-            style: TextStyle(color: Colors.white75, fontSize: 14, height: 1.4),
+            style: TextStyle(color: Colors.white70, fontSize: 14, height: 1.4),
           ),
         ),
         actions: [

@@ -200,7 +200,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: const Text('Delete Account', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
               content: const Text(
                 'Are you absolutely sure you want to delete your account? This action is permanent and will clear all your active journeys, emergency guardians, and location logs.',
-                style: TextStyle(color: Colors.white75),
+                style: TextStyle(color: Colors.white70),
               ),
               actions: [
                 TextButton(
